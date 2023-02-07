@@ -15,14 +15,17 @@ import android.Manifest;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.tasks.OnSuccessListener;
 
 import java.io.IOException;
@@ -34,7 +37,9 @@ public class aparcament extends AppCompatActivity implements OnMapReadyCallback,
     GoogleMap mMap;
     private FusedLocationProviderClient location;
     Button btn;
-    LatLng aparcament = new LatLng(2,2);
+    LatLng aparcament ;
+    TextView ciutatTV, direccioTV;
+
 
     @RequiresApi(api = Build.VERSION_CODES.M)
     @Override
@@ -44,14 +49,17 @@ public class aparcament extends AppCompatActivity implements OnMapReadyCallback,
         String[] perms = {Manifest.permission.ACCESS_FINE_LOCATION,
                 Manifest.permission.ACCESS_COARSE_LOCATION};
         requestPermissions(perms, 0);
+        aparcament= new LatLng(2,2);
+
 
         btn = (Button) findViewById(R.id.button);
         location = LocationServices.getFusedLocationProviderClient(this);
+        ciutatTV = (TextView) findViewById(R.id.ciutatTV);
+        direccioTV = (TextView) findViewById(R.id.DIRECCIOTV);
 
-
+        getLocation();
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
-
 
 
     }
@@ -65,20 +73,47 @@ public class aparcament extends AppCompatActivity implements OnMapReadyCallback,
         btn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-            getLocation();
+                getLocation();
 
                 try {
                     Log.d("quepasaa2", getPoblacio(aparcament));
+                    ciutatTV.setText(getPoblacio(aparcament));
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
                 try {
                     Log.d("quepasaa3", getAdresa(aparcament));
+                    direccioTV.setText(getAdresa(aparcament));
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
 
+                MarkerOptions markerOptions = new MarkerOptions();
+                if (ActivityCompat.checkSelfPermission(getApplicationContext(), android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(getApplicationContext(), android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        requestPermissions(
+                                new String[] { android.Manifest.permission.ACCESS_COARSE_LOCATION },
+                                1);
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        requestPermissions(
+                                new String[] { Manifest.permission.ACCESS_FINE_LOCATION},
+                                2);
+                    }
+                    return;
+                }
+                markerOptions.position(aparcament);
+                try {
+                    markerOptions.title(getPoblacio(aparcament));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                mMap.clear();
+                mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(aparcament,15));
+                mMap.addMarker(markerOptions);
             }
+
+
         });
 
     }

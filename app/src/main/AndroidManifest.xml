@@ -20,7 +20,7 @@
 
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyCexy-3cjD4lA2fyqr4DnYb651eizaFnek" />
+            android:value="AIzaSyAwgdtUB1lVSF-r46nRffHXOB4IIxBxNVY" />
 
         <activity
             android:name=".aparcament"
