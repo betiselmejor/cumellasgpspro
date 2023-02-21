@@ -8,6 +8,16 @@
 
 
     <Button
+        android:id="@+id/buttonTrack"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="126dp"
+        android:layout_marginBottom="151dp"
+        android:text="Track"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <Button
         android:id="@+id/buttonAparcament"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -25,4 +35,5 @@
         android:text="Cords"
         app:layout_constraintBaseline_toBaselineOf="@+id/buttonAparcament"
         app:layout_constraintEnd_toEndOf="parent" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>
