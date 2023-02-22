@@ -87,12 +87,12 @@
         app:layout_constraintTop_toBottomOf="@+id/textView6" />
 
     <Button
-        android:id="@+id/button3"
+        android:id="@+id/importgpx"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="36dp"
-        android:layout_marginBottom="52dp"
-        android:text="SetStart"
+        android:layout_marginStart="16dp"
+        android:layout_marginBottom="44dp"
+        android:text="importgpx"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 

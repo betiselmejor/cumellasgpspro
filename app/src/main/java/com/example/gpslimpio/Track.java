@@ -2,11 +2,18 @@ package com.example.gpslimpio;
 
 import static android.content.ContentValues.TAG;
 
+import androidx.activity.result.ActivityResult;
+import androidx.activity.result.ActivityResultCallback;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -16,12 +23,16 @@ import android.location.GpsStatus;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.DocumentsContract;
 import android.provider.Settings;
 import android.util.Log;
+import android.util.Xml;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
@@ -41,12 +52,22 @@ import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.tasks.OnSuccessListener;
 import android.Manifest;
+
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
+import org.xmlpull.v1.XmlPullParserFactory;
+import org.xmlpull.v1.XmlSerializer;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 
 public class Track extends AppCompatActivity implements LocationListener, GpsStatus.Listener,OnMapReadyCallback,TaskLoadedCallback{
 
-    Button startStop,setMarkers;
+    Button startStop,importgpx;
     Polyline currentp;
     private FusedLocationProviderClient location;
     GoogleMap mMap;
@@ -58,8 +79,11 @@ public class Track extends AppCompatActivity implements LocationListener, GpsSta
     boolean tracking = false;
     boolean startStopp=false;
     private GoogleApiClient mGoogleApiClient;
+    private static final int PICK_PDF_FILE = 2;
     ArrayList<LatLng> points = new ArrayList<>();
     Polyline line;
+    private static final int PICK_XML_FILE = 1;
+    ArrayList<LatLng> ubicacionsImport= new ArrayList<>();
     ArrayList<LatLng> ubicacions= new ArrayList<>();
     ArrayList<MarkerOptions> marcadors = new ArrayList<>();
     private Handler handler = new Handler(Looper.getMainLooper());
@@ -74,7 +98,49 @@ public class Track extends AppCompatActivity implements LocationListener, GpsSta
 
 
         startStop = (Button) findViewById(R.id.button2);
-        setMarkers = (Button) findViewById(R.id.button3);
+        importgpx = (Button) findViewById(R.id.importgpx);
+        importgpx.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+
+                    ActivityCompat.requestPermissions((Activity) getApplicationContext(), new String[] {Manifest.permission.READ_EXTERNAL_STORAGE}, 345);
+                    return;
+                }
+                Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+                intent.setType("*/*");
+                String[] mimeTypes = {"application/gpx+xml", "application/xml","text/xml"};
+                intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
+                startActivityForResult(intent, PICK_XML_FILE);
+
+
+
+//                // Crea un intent para seleccionar un archivo GPX
+//                Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+//                intent.setType("*/*");
+//                intent.addCategory(Intent.CATEGORY_OPENABLE);
+//                String[] mimeTypes = {"application/gpx+xml", "application/xml"};
+//                intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
+//
+//// Agrega el filtro de proveedor de documentos
+//                intent.putExtra(Intent.EXTRA_LOCAL_ONLY, true);
+//
+//// Inicia la actividad para seleccionar el archivo GPX
+//                startActivityForResult(intent, 333);
+
+
+//                Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+//                intent.setType("application/gpx+xml");
+//                intent.addCategory(Intent.CATEGORY_OPENABLE);
+
+                try {
+                    startActivityForResult(Intent.createChooser(intent, "Select a File to Upload"), 333);
+                } catch (android.content.ActivityNotFoundException ex) {
+                    Toast.makeText(getApplicationContext(), "Please install a File Manager.", Toast.LENGTH_SHORT).show();
+                }
+            }
+
+        });
 
         location = LocationServices.getFusedLocationProviderClient(this);
 
@@ -115,6 +181,7 @@ public class Track extends AppCompatActivity implements LocationListener, GpsSta
         }
     }
 
+
     @SuppressLint("MissingPermission")
     private void getLocation(){
         location.getLastLocation()
@@ -147,18 +214,22 @@ public class Track extends AppCompatActivity implements LocationListener, GpsSta
     @Override
     public void onLocationChanged(@NonNull Location location) {
         if (startStopp==false){
+
             hereLocation(location);
             double latitude = location.getLatitude();
             double longitude = location.getLongitude();
             LatLng latLng = new LatLng(latitude, longitude);
-            ubicacions.add(latLng);
-            Log.d("array","LAT: " + latitude + " LONG: " + longitude + "size: " + ubicacions.size());
+
+                ubicacions.add(latLng);
+                Log.d("array","LAT: " + latitude + " LONG: " + longitude + "size: " + ubicacions.size());
+
 
 
             mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng,15));
 
             points.add(latLng);
             redrawLine();
+
         }
 
 
@@ -199,10 +270,12 @@ public class Track extends AppCompatActivity implements LocationListener, GpsSta
                         checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!= PackageManager.PERMISSION_GRANTED){
                     requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 10);
                 }else if (tracking==false){
+                    mMap.clear();
                     showLocation();
                     handler.postDelayed(new Runnable() {
                         @Override
                         public void run() {
+                            points = new ArrayList<>();
                         LatLng principiR= new LatLng(Double.valueOf(String.valueOf(latitude_tv.getText())), Double.valueOf(String.valueOf(longitude_tv.getText())));
                         mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(principiR,15));
                         MarkerOptions markerOptions = new MarkerOptions();
@@ -212,6 +285,7 @@ public class Track extends AppCompatActivity implements LocationListener, GpsSta
                         mMap.addMarker(markerOptions);
                         tracking=true;
                         startStop.setText("STOP");
+                            startStopp=false;
                         }
                     },200);
 
@@ -224,6 +298,14 @@ public class Track extends AppCompatActivity implements LocationListener, GpsSta
                     startStopp=true;
                     locationManager=null;
                     location=null;
+                    startStop.setText("START");
+                    try {
+                        writeFile();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+
+                    tracking=false;
                 }
             }
         });
@@ -293,5 +375,136 @@ public class Track extends AppCompatActivity implements LocationListener, GpsSta
             currentp.remove();
         }
         currentp= mMap.addPolyline((PolylineOptions) values[0]);
+    }
+
+    public void writeFile() throws IOException {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+
+            ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE}, 500);
+            return;
+        }
+
+
+        File folder =  Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM);
+
+
+        File file= new File(folder,"ruta.gpx");
+        FileOutputStream fos = new FileOutputStream(file);
+        XmlSerializer serializer = Xml.newSerializer();
+        serializer.setOutput(fos,"UTF-8");
+
+        serializer.startDocument("UTF-8",Boolean.valueOf(true));
+
+        serializer.startTag(null,"gpx");
+        serializer.attribute(null,"version","1.1");
+        serializer.attribute(null,"appgps","APP");
+
+
+        serializer.startTag(null,"trk");
+        serializer.startTag(null,"rutaApp");
+        serializer.text("Mi pista");
+        serializer.endTag(null,"rutaApp");
+
+
+        serializer.startTag(null, "trkseg");
+
+        for (int i = 0; i < ubicacions.size(); i++) {
+            serializer.startTag(null,"trkpt");
+            serializer.attribute(null, "lat",String.valueOf(ubicacions.get(i).latitude));
+            serializer.attribute(null, "lon",String.valueOf(ubicacions.get(i).longitude));
+            serializer.endTag(null,"trkpt");
+        }
+
+        serializer.endTag(null,"trkseg");
+
+        serializer.endTag(null,"trk");
+        serializer.endTag(null,"gpx");
+
+        serializer.endDocument();
+
+        fos.close();
+        Toast.makeText(getApplicationContext(), "route saved", Toast.LENGTH_SHORT).show();
+
+
+    }
+
+
+    public void readFile(Uri uri) throws IOException, XmlPullParserException {
+
+        Toast.makeText(getApplicationContext(),"asdasdasdasda", Toast.LENGTH_SHORT).show();
+
+        InputStream inputStream = getContentResolver().openInputStream(uri);
+        XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
+        factory.setNamespaceAware(true);
+        XmlPullParser xpp = factory.newPullParser();
+        xpp.setInput(inputStream,null);
+
+
+        while (xpp.getEventType() != XmlPullParser.END_DOCUMENT) {
+            if (xpp.getEventType() == XmlPullParser.START_TAG && xpp.getName().equals("trkpt")) {
+                Double lat = Double.valueOf(xpp.getAttributeValue(null, "lat"));
+                Double lon = Double.valueOf(xpp.getAttributeValue(null, "lon"));
+
+                ubicacionsImport.add(new LatLng(lat,lon));
+            }
+            xpp.next();
+        }
+        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(ubicacionsImport.get(1),15));
+
+
+        inputStream.close();
+
+        drawImportLine();
+    }
+
+    public void drawImportLine(){
+            mMap.clear();
+            int middle= ubicacionsImport.size()/2;
+
+        PolylineOptions options2 = new PolylineOptions().width(5).color(Color.RED).geodesic(true);
+        for (int i = 0; i < ubicacionsImport.size(); i++) {
+            if (i==1){
+                MarkerOptions markerOptions3 = new MarkerOptions();
+                markerOptions3.position(ubicacionsImport.get(i));
+                markerOptions3.title("Principi");
+                markerOptions3.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN));
+                mMap.addMarker(markerOptions3);
+            }else if (i==middle){
+                MarkerOptions markerOptions3 = new MarkerOptions();
+                markerOptions3.position(ubicacionsImport.get(i));
+                markerOptions3.title("Mitja ruta");
+                markerOptions3.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE));
+                mMap.addMarker(markerOptions3);
+            }else if (i==ubicacionsImport.size()-2){
+                MarkerOptions markerOptions3 = new MarkerOptions();
+                markerOptions3.position(ubicacionsImport.get(i));
+                markerOptions3.title("Final");
+                markerOptions3.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED));
+                mMap.addMarker(markerOptions3);
+            }
+            LatLng point = ubicacionsImport.get(i);
+            options2.add(point);
+        }
+
+        line = mMap.addPolyline(options2);
+
+
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        Toast.makeText(getApplicationContext(),"actresult", Toast.LENGTH_SHORT).show();
+
+        if (requestCode == PICK_XML_FILE && resultCode == RESULT_OK) {
+            Uri uri = data.getData();
+
+            try {
+                readFile(uri);
+            } catch (XmlPullParserException | IOException e) {
+                e.printStackTrace();
+            }
+
+        }
     }
 }
